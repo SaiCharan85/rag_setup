@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Document Upload and Question Answering</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .container {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .nav {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        .nav a {
+            text-decoration: none;
+            color: #333;
+            padding: 10px 20px;
+            border-radius: 4px;
+            background-color: #f0f0f0;
+            transition: all 0.3s ease;
+        }
+        .nav a:hover {
+            background-color: #e0e0e0;
+        }
+        .nav a.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .section {
+            display: none;
+            margin-bottom: 30px;
+        }
+        .section.active {
+            display: block;
+        }
+        .upload-form, .question-form {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .submit-btn {
+            padding: 12px 24px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+        .submit-btn:hover {
+            background-color: #45a049;
+        }
+        .response {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #e6ffe6;
+            color: #006600;
+        }
+        .error {
+            background-color: #ffe6e6;
+            color: #cc0000;
+        }
+        .answer-container {
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .context {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-radius: 4px;
+        }
+        .file-input {
+            padding: 10px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Document Upload and Question Answering</h1>
+        <div class="nav">
+            <a href="#" class="nav-link active" data-section="upload">Upload Documents</a>
+            <a href="#" class="nav-link" data-section="question">Ask Questions</a>
+        </div>
+
+        <div id="uploadSection" class="section active">
+            <div class="upload-form">
+                <h2>Upload Documents</h2>
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <div class="file-input">
+                        <input type="file" name="file" accept=".pdf,.docx,.pptx,.txt" required>
+                    </div>
+                    <button type="submit" class="submit-btn">Upload Document</button>
+                </form>
+                <div id="uploadResponse" class="response"></div>
+            </div>
+        </div>
+
+        <div id="questionSection" class="section">
+            <div class="question-form">
+                <h2>Ask Questions</h2>
+                <div class="input-group">
+                    <label for="question">Your Question:</label>
+                    <input type="text" id="question" required>
+                </div>
+                <button type="button" id="askBtn" class="submit-btn">Ask Question</button>
+            </div>
+            <div id="questionResponse" class="response"></div>
+            <div id="answerContainer" class="answer-container" style="display: none;">
+                <h3>Answer:</h3>
+                <div id="answer"></div>
+                <h3>Context:</h3>
+                <div id="context" class="context"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Navigation handling
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const section = this.dataset.section;
+                
+                // Update active link
+                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Show/hide sections
+                document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+                document.getElementById(`${section}Section`).classList.add('active');
+            });
+        });
+
+        // Upload form handling
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const responseDiv = document.getElementById('uploadResponse');
+            
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    responseDiv.className = 'response success';
+                    responseDiv.textContent = `Document processed successfully! ${data.num_chunks} chunks created.`;
+                } else {
+                    responseDiv.className = 'response error';
+                    responseDiv.textContent = `Error: ${data.error}`;
+                }
+            } catch (error) {
+                responseDiv.className = 'response error';
+                responseDiv.textContent = 'Error: Failed to upload document';
+            }
+        });
+
+        // Question form handling
+        document.getElementById('askBtn').addEventListener('click', async function() {
+            const question = document.getElementById('question').value;
+            const responseDiv = document.getElementById('questionResponse');
+            const answerContainer = document.getElementById('answerContainer');
+            
+            if (!question) {
+                responseDiv.className = 'response error';
+                responseDiv.textContent = 'Please enter a question';
+                return;
+            }
+            
+            try {
+                const response = await fetch('/answer', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ question: question })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    responseDiv.className = 'response success';
+                    responseDiv.textContent = 'Question answered successfully!';
+                    
+                    answerContainer.style.display = 'block';
+                    document.getElementById('answer').textContent = data.answer;
+                    document.getElementById('context').textContent = data.context;
+                } else {
+                    responseDiv.className = 'response error';
+                    responseDiv.textContent = `Error: ${data.error}`;
+                }
+            } catch (error) {
+                responseDiv.className = 'response error';
+                responseDiv.textContent = 'Error: Failed to get answer';
+            }
+        });
+    </script>
+</body>
+</html>

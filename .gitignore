@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+*.log
+.env
+*.model
+*.pt
+*.bin
+*.h5
+*.json
+*.txt
+*.csv
