@@ -13,11 +13,15 @@ def evaluate(custom_input=False):
     print("Usage:")
     print("- Default mode: Evaluates the model using predefined test cases")
     print("- Custom mode: Evaluates the model with your own context, question, and answer")
+    print("- Target accuracy: 70% or higher")
     print("")
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     tokenizer = T5Tokenizer.from_pretrained(MODEL_PATH)
     model = T5ForConditionalGeneration.from_pretrained(MODEL_PATH).to(device)
+    
+    # Additional metrics
+    rouge = Rouge()
 
     # Test cases based on the networks document
     test_cases = [
@@ -74,10 +78,12 @@ def evaluate(custom_input=False):
 
         outputs = model.generate(
             **inputs,
-            max_length=128,
-            num_beams=4,
-            temperature=0.7,
-            no_repeat_ngram_size=2
+            max_length=256,  # Increased max length for more natural responses
+            num_beams=8,  # Increased beams for better quality
+            temperature=0.9,  # Higher temperature for more diverse responses
+            top_p=0.9,  # Top-p sampling for natural language
+            no_repeat_ngram_size=3,
+            do_sample=True
         )
         prediction = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
@@ -115,13 +121,65 @@ def evaluate(custom_input=False):
     recall = tp / (tp + fn) if (tp + fn) > 0 else 0
     f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
     
-    # Generate classification report
-    print(f"\n\nEvaluation Results:")
-    print(f"Exact Match Accuracy: {exact_match:.4f}")
-    print(f"Average Similarity Score: {avg_similarity:.4f}\n")
+    # Calculate comprehensive metrics
+    rouge_scores = []
+    bleu_scores = []
+    exact_match_count = 0
+    natural_response_count = 0
     
-    # Print token-level metrics
-    print("Token-level Metrics:")
+    for pred, true in zip(y_pred, y_true):
+        # Calculate BLEU score
+        reference = [word_tokenize(true)]
+        candidate = word_tokenize(pred)
+        bleu_score = sentence_bleu(reference, candidate)
+        bleu_scores.append(bleu_score)
+        
+        # Calculate BLEU score
+        reference = [true.split()]
+        candidate = pred.split()
+        bleu_scores.append(sentence_bleu(reference, candidate))
+        
+        # Check for exact match
+        if pred == true:
+            exact_match_count += 1
+            
+        # Check for natural language response
+        if "I found" in pred or "This means" in pred or "In other words" in pred:
+            natural_response_count += 1
+    
+    exact_match_rate = exact_match_count / len(y_true)
+    natural_response_rate = natural_response_count / len(y_true)
+    
+    # Calculate average BLEU score
+    avg_bleu = sum(bleu_scores) / len(bleu_scores)
+    
+    # Calculate average BLEU score
+    avg_bleu = sum(bleu_scores) / len(bleu_scores)
+    
+    print("\n Evaluation Results:")
+    print(f"Exact Match Accuracy: {exact_match_rate:.2%}")
+    print(f"Natural Response Rate: {natural_response_rate:.2%}")
+    print(f"Average BLEU Score: {avg_bleu:.4f}")
+    print(f"Natural Response Rate: {natural_response_rate:.2%}")
+    
+    # Check if we meet the 70% accuracy target
+    if exact_match_rate >= 0.7:
+        print("\n Target accuracy achieved!")
+    else:
+        print(f"\n Target accuracy not met. Current accuracy: {exact_match_rate:.2%}")
+    
+    # Generate visualization of similarity scores
+    plt.figure(figsize=(10, 6))
+    plt.hist(similarities, bins=20, alpha=0.7)
+    plt.title('Similarity Scores Distribution')
+    plt.xlabel('Similarity Score')
+    plt.ylabel('Frequency')
+    plt.axvline(x=0.7, color='r', linestyle='--', label='Target Accuracy')
+    plt.legend()
+    plt.savefig('similarity_scores.png')
+    print("\n Similarity score distribution saved to 'similarity_scores.png'")
+    
+    print("\nToken-level Metrics:")
     print(f"Precision: {precision:.4f}")
     print(f"Recall: {recall:.4f}")
     print(f"F1 Score: {f1:.4f}\n")

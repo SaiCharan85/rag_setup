@@ -1,5 +1,9 @@
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
+import os
+import sys
+import json
+from typing import List, Dict, Any
 
 def calculate_similarity(text1, text2):
     """
